@@ -34,6 +34,10 @@ def generateMilhousePlotsFromBAM( SMRTLinkInfo, num=1000 ):
 	plotSurvival( chip_data, SMRTLinkIDs, SMRTLinkLabels, 'accuracy', legend_loc=3 )
 	plotBoxplot(  chip_data, SMRTLinkIDs, SMRTLinkLabels, 'accuracy' )
 
+	plotBoxplot(  chip_data, SMRTLinkIDs, SMRTLinkLabels, 'insertions', ylab='rate' )
+	plotBoxplot(  chip_data, SMRTLinkIDs, SMRTLinkLabels, 'deletions',  ylab='rate' )
+	plotBoxplot(  chip_data, SMRTLinkIDs, SMRTLinkLabels, 'mismatches', ylab='rate' )
+
 	return chip_data
 
 def plotSurvival( chip_data, SMRTLinkIDs, SMRTLinkLabels, metric, legend_loc=1 ):
@@ -41,7 +45,11 @@ def plotSurvival( chip_data, SMRTLinkIDs, SMRTLinkLabels, metric, legend_loc=1 )
 	plt.hold( True )
 	for chipID in SMRTLinkIDs:
 		sorted_rl = np.sort( chip_data[ chipID ][ metric ] )
-		plt.step( sorted_rl[::-1], np.arange( sorted_rl.size ) / float( len( sorted_rl ) ) )
+		x = sorted_rl[::-1]
+		y = np.arange( sorted_rl.size ) / float( len( sorted_rl ) )
+		trim = np.max( np.where( y <= 0.005 ) )
+		plt.step( x[trim::], y[trim::] )
+
 	plt.grid()
 	plt.xlabel( metric )
 	plt.ylabel( '1 - ecdf' )
@@ -50,13 +58,18 @@ def plotSurvival( chip_data, SMRTLinkIDs, SMRTLinkLabels, metric, legend_loc=1 )
 	fig = plt.gcf()
 	fig.set_size_inches( 10, 6 )
 
-def plotBoxplot( chip_data, SMRTLinkIDs, SMRTLinkLabels, metric, showmean=True ):
+def plotBoxplot( chip_data, SMRTLinkIDs, SMRTLinkLabels, metric, ylab=None, setpositions=None, showmean=True ):
 	data = []
 	for chipID in SMRTLinkIDs:
 		data.append( chip_data[ chipID ][ metric ] )
 
-	ny.coloredBoxplot( data, displabels=SMRTLinkLabels, dispmeans=showmean )
+	ny.coloredBoxplot( data, displabels=SMRTLinkLabels, setpositions=setpositions, dispmeans=showmean )
 	plt.xlabel( 'SMRTLink Job IDs' )
-	plt.ylabel( metric )
+	if not ylab:
+		plt.ylabel( metric )
+	else:
+		plt.ylabel( ylab )
+		plt.title(  metric )
+	
 	fig = plt.gcf()
 	fig.set_size_inches( 10, 6 )
