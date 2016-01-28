@@ -64,7 +64,6 @@ def plotBoxplot( chip_data, SMRTLinkIDs, SMRTLinkLabels, metric, ylab=None, setp
 		data.append( chip_data[ chipID ][ metric ] )
 
 	ny.coloredBoxplot( data, displabels=SMRTLinkLabels, setpositions=setpositions, dispmeans=showmean )
-	plt.xlabel( 'SMRTLink Job IDs' )
 	if not ylab:
 		plt.ylabel( metric )
 	else:
