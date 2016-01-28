@@ -96,46 +96,42 @@ def subsampleReads( alignmentSet, num ):
 		print 'first input must be an instance of the AlignmentSet class from pbcore'
 		return None
 
-# def getAlignmentIndicesOfHoleNumbers( alignmentSet, holenumbers, dict=False ):
-# 	"""
-# 	Take full alignmentSet or list of BamAlignments. Return (toggle) dict/list of indices
+def getAlignmentIndicesOfHoleNumbers( alignmentSet, holenumbers, dict=False ):
+	"""
+	Take full alignmentSet or list of BamAlignments. Return (toggle) dict/list of indices
 
-# 	corresponding to BamAlignments from specific holenumbers.
+	corresponding to BamAlignments from specific holenumbers.
 
-# 	Kristofor Nyquist 12/17/2015
+	Kristofor Nyquist 12/17/2015
 
-# 	"""
+	"""
 
-# 	# allow AlignmentSet class or a python list of BamAlignments
-# 	proceed = False
-# 	if isinstance( alignmentSet, io.AlignmentSet ): 
-# 		proceed = True
+	# allow AlignmentSet class or a python list of BamAlignments
+	proceed = False
+	if isinstance( alignmentSet, io.AlignmentSet ): 
+		proceed = True
 
-# 	if proceed or ( type( alignmentSet ) == list and isinstance( alignmentSet[0], ba ) ):
-# 		indices = {}
-# 		for hole in holenumbers:
-# 			indices[ hole ] = []
+	if proceed or ( type( alignmentSet ) == list and isinstance( alignmentSet[0], ba ) ):
+		indices = {}
+		for hole in holenumbers:
+			indices[ hole ] = list( np.where( alignmentSet.index.holeNumber == hole )[0] )
 
-# 		for ix, read in enumerate( alignmentSet ):
-# 			if read.holeNumber in indices:
-# 				indices[ read.holeNumber ].append( ix )
-
-# 		# dict flag returns results as dictionary: keys are holenumbers, values are subread indices
-# 		if dict:
-# 			return indices
+		# dict flag returns results as dictionary: keys are holenumbers, values are subread indices
+		if dict:
+			return indices
 		
-# 		# dict unflagged returns flattened list of subread indices
-# 		else:
-# 			flattened_indices = []
-# 			for indexlist in indices.values():
-# 				for index in indexlist:
-# 					flattened_indices.append( index )
+		# dict unflagged returns flattened list of subread indices
+		else:
+			flattened_indices = []
+			for indexlist in indices.values():
+				for index in indexlist:
+					flattened_indices.append( index )
 
-# 			return flattened_indices
+			return flattened_indices
 
-# 	else:
-# 		print 'first input must be an instance of the AlignmentSet class from pbcore or a list of BamAlignments from pbcore'
-# 		return None
+	else:
+		print 'first input must be an instance of the AlignmentSet class from pbcore or a list of BamAlignments from pbcore'
+		return None
 
 def subsampleReadsByIndices( alignmentSet, indices ):
 	"""
@@ -188,16 +184,40 @@ def getChipKPIs( SMRTLinkIDs, num=1000 ):
 		if len( a ) > num:					# if # alignments > num,
 			ss = subsampleReads( a, num )	# randomly subsample
 
-		chips[ jobID ] = getAlnBamKPIs( a, ss, num )
+		chips[ jobID ] = getAlnBamKPIs( a, ss )
 
 	return chips
 
-def getAlnBamKPIs( alignmentSet, subsampledSet, num ):
+def getHoleNumberKPIs( SMRTLinkID, holenumbers ):
+	"""
+	Same concept as getChipKPIs except this time it grabs KPIs for specific set of holes
+		<SMRTLinkID>  SMRTLinkID for chip
+		<holenumbers> list of holenumbers
+
+	Kristofor Nyquist 1/27/2016
+	"""
+
+	a = openBAMALN( SMRTLinkID )
+	zmw_alnix_map = getAlignmentIndicesOfHoleNumbers( a, holenumbers, dict=True )
+	
+	zmws = {}
+	for zmw in zmw_alnix_map:
+
+		ss   = []
+		for index in zmw_alnix_map[ zmw ]: 
+			ss.append( a[ index ] )
+			
+		zmws[ index ] = getAlnBamKPIs( a, ss )
+
+	return zmws
+
+def getAlnBamKPIs( alignmentSet, subsampledSet ):
 	"""
 	Retrieve the KPIs for a single chip in a dictionary structure.
 		<alignmentSet> is a pbcore alignmentSet reader object. Likely subsampled using routine subsampleReads(...).
 
 	Kristofor Nyquist 1/26/2016
+
 	"""
 	chip                   = {}
 	chip[ 'readlength' ]   = []
