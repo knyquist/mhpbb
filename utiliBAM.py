@@ -229,6 +229,7 @@ def getAlnBamKPIs( alignmentSet, subsampledSet ):
 	chip[ 'IPD' ]          = []
 
 	for aln in subsampledSet:
+		chip[ 'holenumber'   ] = aln.HoleNumber
 		chip[ 'readlength'   ].append( float( aln.readEnd - aln.readStart ) )
 		chip[ 'templatespan' ].append( float( aln.referenceEnd - aln.referenceStart ) )
 		chip[ 'insertions'   ].append( float( aln.nIns ) / chip[ 'readlength' ][-1] )
