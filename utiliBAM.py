@@ -1,6 +1,7 @@
 from pbcore.io.dataset import DataSetIO as io
 from pbcore.io.align import BamAlignment as ba
 from os import listdir
+import xml.etree.ElementTree as ET
 import numpy as np
 import nyplot as ny
 import random
@@ -47,7 +48,6 @@ def openBAMALN( SMRTLinkID ):
 
 	return dset
 
-
 def getAlignmentDirs( path ):
 
 	contents = listdir( path )
@@ -58,6 +58,80 @@ def getAlignmentDirs( path ):
 			align_dirs.append( item ) 
 
 	return align_dirs
+
+def getReferenceSequence( SMRTLinkID ):
+	"""
+	Find fasta file of reference sequence and return sequence as string
+
+	Kristofor Nyquist 2/12/2016
+	"""
+	if type( SMRTLinkID ) is str and len( SMRTLinkID ) == 6:
+		rootdir = SMRTLinkID[0:3];
+		linkjob = SMRTLinkID;
+		primary_path = '/pbi/dept/secondary/siv/smrtlink/smrtlink-beta/jobs-root/' + rootdir + '/' + linkjob + '/tasks'
+		xml_tree = ET.parse( primary_path + '/pbsmrtpipe.tasks.gather_alignmentset-1/file.alignmentset.xml' )
+		root = xml_tree.getroot()
+
+		# parse xml file to get path to reference fasta. This is hacky code, but gets the job done
+		flag = 0
+		for layer1 in root:
+		    if 'ExternalResources' in layer1.tag and flag == 0:
+		        for layer2 in layer1:
+		            if 'ExternalResource' in layer2.tag and flag == 0:
+		                for layer3 in layer2:
+		                    if 'ExternalResources' in layer3.tag and flag == 0:
+		                        for layer4 in layer3:
+		                            if 'ExternalResource' in layer4.tag and flag == 0:
+		                                for tup in layer4.items():
+		                                    if tup[0] == 'ResourceId':
+		                                        fastaPath = tup[1]
+		                                        flag = 1
+		
+		# create list of the reference sequence
+		ref_file = open( fastaPath, 'rb' )
+		reference = ''
+		ref_file.next() # skip the header
+		for line in ref_file:
+			reference = reference + line[0:-1] # skip \n symbol
+		return reference
+
+def calculateCoverageByGC( SMRTLinkID ):
+	chip_data = openBAMALN( SMRTLinkID )
+	print 'calculating coverage for ' + chip_data.refNames[0]
+	coverage  = chip_data._intervalContour( chip_data.refNames[0] )
+	coverage  = coverage[0:-1]
+	reference = getReferenceSequence( SMRTLinkID )
+	if len( coverage ) == len( reference ): # proceed
+		start_ix = 12						# use a 25 bp window to calculate % GC
+		end_ix   = len( reference ) - 13
+		gc  = []
+		cov = []
+		for i in range( start_ix, end_ix+1 ): # +1 because right boundary is exclusive
+			cov.append( coverage[i] )
+			seq = reference[ i-12:i+13 ].upper()
+			gc_cont = [sub for sub in seq if sub == 'G' or sub == 'C']
+			prct_gc = float( len( gc_cont ) ) / len( seq )
+			gc.append( prct_gc )
+
+		# generate boxplot for each possible value
+		coverage = []
+		labels   = []
+		for i in range( 0, 25+1 ): # +1 because right boundary is exclusive
+		    i = float(i)
+		    ixs = [ ix for ix,val in enumerate( gc ) if val == i/25 ]
+		    
+		    bin_coverage = []
+		    for index in ixs:
+		        bin_coverage.append( cov[index] )
+		    coverage.append( bin_coverage )
+		    labels.append( str(i/25)[1:] )
+		labels[0] = 0
+		labels[-1] = 1
+
+		return ( coverage, labels )
+
+	else:
+		print 'Coverage map has a different length than the reference sequence. There is a problem'
 
 def convertHoleNumber2XY( holenumber ):
 	"""
