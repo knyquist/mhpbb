@@ -96,6 +96,15 @@ def getReferenceSequence( SMRTLinkID ):
 		return reference
 
 def calculateCoverageByGC( SMRTLinkID ):
+	"""
+	Use pbcore's _intervalContour to retrieve the number of reads covering each base in the reference sequence.
+	Use utiliBAM's getReferenceSequence to retrieve the reference sequence.
+
+	Calculate the coverage by GC percentage and return for convenient boxplotting
+
+	Kristofor Nyquist 2/12/2016
+	"""
+
 	chip_data = openBAMALN( SMRTLinkID )
 	print 'calculating coverage for ' + chip_data.refNames[0]
 	coverage  = chip_data._intervalContour( chip_data.refNames[0] )
