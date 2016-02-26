@@ -59,6 +59,36 @@ def getAlignmentDirs( path ):
 
 	return align_dirs
 
+def getPrimaryFolder( SMRTLinkID ):
+    
+	rootdir  = SMRTLinkID[0:3];
+	linkjob  = SMRTLinkID;
+	filename1 = '/pbi/dept/secondary/siv/smrtlink/smrtlink-beta/jobs-root/' + rootdir + '/' + linkjob + '/tasks/pbsmrtpipe.tasks.subreadset_align_scatter-1/chunk_subreadset_0.subreadset.xml'
+	filename2 = '/pbi/dept/secondary/siv/smrtlink/smrtlink-beta/jobs-root/' + rootdir + '/' + linkjob + '/tasks/pbcoretools.tasks.subreadset_align_scatter-1/chunk_subreadset_0.subreadset.xml'
+
+	try:
+		xml_tree = ET.parse( filename1 )
+	except IOError:
+		xml_tree = ET.parse( filename2 )
+	except IOError:
+		print 'Could not find primary location' # did not find xml file that points to primary folder
+		return None
+
+	root = xml_tree.getroot()
+	for layer1 in root:
+		if 'ExternalResources' in layer1.tag:
+			for layer2 in layer1:
+				if 'ExternalResource' in layer2.tag:
+					for tup in layer2.items():
+						if tup[0] == 'ResourceId':
+							folder = tup[1].split('/')
+							folder = folder[0:-1]
+							folder = '/'.join( folder )
+							return folder # found primary folder
+
+	print 'Found xml pointer file, but was unable to find primary folder path'
+	return None
+
 def getReferenceSequence( SMRTLinkID ):
 	"""
 	Find fasta file of reference sequence and return sequence as string
@@ -96,6 +126,15 @@ def getReferenceSequence( SMRTLinkID ):
 		return reference
 
 def calculateCoverageByGC( SMRTLinkID ):
+	"""
+	Use pbcore's _intervalContour to retrieve the number of reads covering each base in the reference sequence.
+	Use utiliBAM's getReferenceSequence to retrieve the reference sequence.
+
+	Calculate the coverage by GC percentage and return for convenient boxplotting
+
+	Kristofor Nyquist 2/12/2016
+	"""
+
 	chip_data = openBAMALN( SMRTLinkID )
 	print 'calculating coverage for ' + chip_data.refNames[0]
 	coverage  = chip_data._intervalContour( chip_data.refNames[0] )
