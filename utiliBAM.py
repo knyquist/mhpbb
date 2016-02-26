@@ -70,7 +70,7 @@ def getPrimaryFolder( SMRTLinkID ):
 		xml_tree = ET.parse( filename1 )
 	except IOError:
 		xml_tree = ET.parse( filename2 )
-	except IOError:
+	else:
 		print 'Could not find primary location' # did not find xml file that points to primary folder
 		return None
 
