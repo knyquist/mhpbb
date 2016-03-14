@@ -1,5 +1,6 @@
 from pbcore.io.dataset import DataSetIO as io
 from pbcore.io.align import BamAlignment as ba
+from pbcore.io import BamIO
 from os import listdir
 import xml.etree.ElementTree as ET
 import numpy as np
@@ -60,34 +61,60 @@ def getAlignmentDirs( path ):
 	return align_dirs
 
 def getPrimaryFolder( SMRTLinkID ):
-    
+
 	rootdir  = SMRTLinkID[0:3];
 	linkjob  = SMRTLinkID;
 	filename1 = '/pbi/dept/secondary/siv/smrtlink/smrtlink-beta/jobs-root/' + rootdir + '/' + linkjob + '/tasks/pbsmrtpipe.tasks.subreadset_align_scatter-1/chunk_subreadset_0.subreadset.xml'
 	filename2 = '/pbi/dept/secondary/siv/smrtlink/smrtlink-beta/jobs-root/' + rootdir + '/' + linkjob + '/tasks/pbcoretools.tasks.subreadset_align_scatter-1/chunk_subreadset_0.subreadset.xml'
 
+	flag = 0
 	try:
 		xml_tree = ET.parse( filename1 )
+		flag = 1
 	except IOError:
-		xml_tree = ET.parse( filename2 )
-	else:
-		print 'Could not find primary location' # did not find xml file that points to primary folder
+		try:
+			xml_tree = ET.parse( filename2 )
+			flag = 1
+		except:
+			print 'Could not find primary location, failing gracefully w/o primary location' # did not find xml file that points to primary folder
+			return None
+	if flag == 1:
+		root = xml_tree.getroot()
+		for layer1 in root:
+			if 'ExternalResources' in layer1.tag:
+				for layer2 in layer1:
+					if 'ExternalResource' in layer2.tag:
+						for tup in layer2.items():
+							if tup[0] == 'ResourceId':
+								folder = tup[1].split('/')
+								folder = folder[0:-1]
+								folder = '/'.join( folder )
+								return folder # found primary folder
+
+		print 'Found xml pointer file, but was unable to find primary folder path'
 		return None
 
-	root = xml_tree.getroot()
-	for layer1 in root:
-		if 'ExternalResources' in layer1.tag:
-			for layer2 in layer1:
-				if 'ExternalResource' in layer2.tag:
-					for tup in layer2.items():
-						if tup[0] == 'ResourceId':
-							folder = tup[1].split('/')
-							folder = folder[0:-1]
-							folder = '/'.join( folder )
-							return folder # found primary folder
-
-	print 'Found xml pointer file, but was unable to find primary folder path'
-	return None
+def getTotalNumberOfAvailableZMWs( SMRTLinkID ):
+	try:
+		primary_path = getPrimaryFolder( SMRTLinkID )
+	except:
+		print 'could not find primary location, failing gracefully'
+	else:
+		if not primary_path:
+			print 'Error: getPrimaryFolder() returned None'
+			return None
+		else:
+			try: # to identify the subreads.bam file
+				primary_files = listdir( primary_path )
+				subread_files = [ f for f in primary_files if 'subreads.bam' in f ]
+				subread_bam = min( subread_files, key=len )
+				full_path = primary_path + '/' + subread_bam
+			except:
+				print 'could not find the subreads.bam file, failing gracefully'
+				return None
+			else:
+				indexed_subread_reader = BamIO.IndexedBamReader( full_path )
+				return len( indexed_subread_reader.index )
 
 def getReferenceSequence( SMRTLinkID ):
 	"""
@@ -202,7 +229,10 @@ def subsampleReads( alignmentSet, num ):
 	"""
 
 	if isinstance( alignmentSet, io.AlignmentSet ):
-		ss = random.sample( alignmentSet, num )
+		if len( alignmentSet ) > num:					# make sure there are enough alignments to subsample
+			ss = random.sample( alignmentSet, num )
+		else:
+			ss = alignmentSet 							# if there are less alignments than desired subsample ss = a
 		return ss
 
 	else:
@@ -293,11 +323,9 @@ def getChipKPIs( SMRTLinkIDs, num=1000 ):
 
 	chips = {}								# chips dict will store KPIs for each chip
 	for jobID in SMRTLinkIDs:
-		a = openBAMALN( jobID )            	# open alignment reader
-		if len( a ) > num:					# if # alignments > num,
-			ss = subsampleReads( a, num )	# randomly subsample
-
-		chips[ jobID ] = getAlnBamKPIs( a, ss )
+		a  = openBAMALN( jobID )            	# open alignment reader
+		ss = subsampleReads( a, num )			# randomly subsample
+		chips[ jobID ] = getAlnBamKPIs( a, ss, jobID )
 
 	return chips
 
@@ -324,7 +352,7 @@ def getHoleNumberKPIs( SMRTLinkID, holenumbers ):
 
 	return zmws
 
-def getAlnBamKPIs( alignmentSet, subsampledSet ):
+def getAlnBamKPIs( alignmentSet, subsampledSet, SMRTLinkID ):
 	"""
 	Retrieve the KPIs for a single chip in a dictionary structure.
 		<alignmentSet> is a pbcore alignmentSet reader object. Likely subsampled using routine subsampleReads(...).
@@ -353,6 +381,17 @@ def getAlnBamKPIs( alignmentSet, subsampledSet ):
 		chip[ 'IPD'          ].append( aln.IPD() )
 
 	chip[ 'polreadlength' ] = reconstructPolReadlength( alignmentSet, subsampledSet )			# add polymerase read length as KPI
+	chip[ 'total nreads' ]  = len( alignmentSet.index )
+	try: # getting the total number of ZMWs from primary
+		 # I do a try, because if the file system changes, this is going to fail and I want it to fail gracefully
+		total_ZMWs = getTotalNumberOfAvailableZMWs( SMRTLinkID )
+	except:
+		print 'getTotalNumberofAvailableZMWs failed, cannot calculate loading percentage'
+	else:
+		if not total_ZMWs:
+			print 'getTotalNumberofAvailableZMWs returned None, cannot calculate loading percentage'
+		else:
+			chip[ 'fraction loaded' ] = float(chip[ 'total nreads' ])/total_ZMWs
 
 	return chip
 
@@ -363,12 +402,19 @@ def reconstructPolReadlength( alignmentSet, subsampledSet ):
 		<subsampledSet> is the subsampled dataset reader used for estimating the other KPIs
 
 	Kristofor Nyquist 1/27/2016
+		updated 3/14/2016 for aln_index exception catching
 	"""
 	
 	polreadlength = []
 	for aln in subsampledSet:
 		hn = aln.holeNumber
-		polreadlength.append( max( alignmentSet.index[ alignmentSet.index.holeNumber == hn ].aEnd ) - min( alignmentSet.index[ alignmentSet.index.holeNumber == hn ].aStart ) )
+		try:
+			max_aln_index = max( alignmentSet.index[ alignmentSet.index.holeNumber == hn ].aEnd )
+			min_aln_index = min( alignmentSet.index[ alignmentSet.index.holeNumber == hn ].aStart )
+		except:
+			print 'holenumber did not have alignment end or alignment start indices.'
+		else:
+			polreadlength.append( max_aln_index - min_aln_index )
 
 	return polreadlength
 

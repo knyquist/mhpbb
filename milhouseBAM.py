@@ -1,4 +1,5 @@
 import matplotlib.pylab as pylab
+import matplotlib.pyplot as pyplot
 pylab.rcParams['figure.figsize'] = 20, 15
 import matplotlib.pyplot as plt
 plt.rcParams['figure.figsize'] = 20, 15
@@ -22,6 +23,12 @@ def generateMilhousePlotsFromBAM( SMRTLinkInfo, num=1000 ):
 	chip_data = ubm.getChipKPIs( SMRTLinkIDs, num )
 
 	### generate the plots
+	plotBar( chip_data, SMRTLinkIDs, SMRTLinkLabels, 'total nreads' )
+	try:
+		plotBar( chip_data, SMRTLinkIDs, SMRTLinkLabels, 'fraction loaded' )
+	except:
+		print 'was unable to generate fraction loaded barplot. Most likely was unable to find location of primary folder for opening up subreads.bam file'
+
 	plotSurvival( chip_data, SMRTLinkIDs, SMRTLinkLabels, 'readlength' )
 	plotBoxplot(  chip_data, SMRTLinkIDs, SMRTLinkLabels, 'readlength' )
 
@@ -39,6 +46,25 @@ def generateMilhousePlotsFromBAM( SMRTLinkInfo, num=1000 ):
 	plotBoxplot(  chip_data, SMRTLinkIDs, SMRTLinkLabels, 'mismatches', ylab='rate' )
 
 	return chip_data
+
+def plotBar( chip_data, SMRTLinkIDs, SMRTLinkLabels, metric, legend_loc=1, width=0.4 ):
+	plt.figure()
+	plt.hold( True )
+
+	left = 1; left_record = [ left ]
+	for chipID in SMRTLinkIDs:
+		pyplot.bar( left, chip_data[ chipID ][ metric ], width )
+		left += 1
+		left_record.append( left )
+	left_record = left_record[0:-1]
+
+	tick_locs = [ rec+width/2. for rec in left_record ]
+	plt.xticks( tick_locs, SMRTLinkLabels )
+	plt.xlim( ( min(tick_locs)-width/2., max(tick_locs)+width/2. ) )
+	plt.ylabel( metric )
+	plt.title( metric )
+	fig = plt.gcf()
+	fig.set_size_inches( 10, 6 )
 
 def plotSurvival( chip_data, SMRTLinkIDs, SMRTLinkLabels, metric, legend_loc=1 ):
 	plt.figure()
