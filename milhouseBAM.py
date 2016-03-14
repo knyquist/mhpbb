@@ -25,7 +25,7 @@ def generateMilhousePlotsFromBAM( SMRTLinkInfo, num=1000 ):
 	### generate the plots
 	plotBar( chip_data, SMRTLinkIDs, SMRTLinkLabels, 'total nreads' )
 	try:
-		plotBar( chip_data, SMRTLinkIDs, SMRTLinkLabels, 'fraction loaded' )
+		plotBar( chip_data, SMRTLinkIDs, SMRTLinkLabels, 'fraction mapped' )
 	except:
 		print 'was unable to generate fraction loaded barplot. Most likely was unable to find location of primary folder for opening up subreads.bam file'
 

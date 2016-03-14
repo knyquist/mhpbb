@@ -94,7 +94,7 @@ def getPrimaryFolder( SMRTLinkID ):
 		print 'Found xml pointer file, but was unable to find primary folder path'
 		return None
 
-def getTotalNumberOfAvailableZMWs( SMRTLinkID ):
+def getTotalNumberOfSubreads( SMRTLinkID ):
 	try:
 		primary_path = getPrimaryFolder( SMRTLinkID )
 	except:
@@ -384,14 +384,14 @@ def getAlnBamKPIs( alignmentSet, subsampledSet, SMRTLinkID ):
 	chip[ 'total nreads' ]  = len( alignmentSet.index )
 	try: # getting the total number of ZMWs from primary
 		 # I do a try, because if the file system changes, this is going to fail and I want it to fail gracefully
-		total_ZMWs = getTotalNumberOfAvailableZMWs( SMRTLinkID )
+		total_subreads = getTotalNumberOfSubreads( SMRTLinkID )
 	except:
-		print 'getTotalNumberofAvailableZMWs failed, cannot calculate loading percentage'
+		print 'getTotalNumberOfSubreads failed, cannot calculate fraction mapped'
 	else:
-		if not total_ZMWs:
-			print 'getTotalNumberofAvailableZMWs returned None, cannot calculate loading percentage'
+		if not total_subreads:
+			print 'getTotalNumberOfSubreads returned None, cannot calculate fraction mapped'
 		else:
-			chip[ 'fraction loaded' ] = float(chip[ 'total nreads' ])/total_ZMWs
+			chip[ 'fraction mapped' ] = float(chip[ 'total nreads' ])/total_subreads
 
 	return chip
 
