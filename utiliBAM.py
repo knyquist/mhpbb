@@ -61,24 +61,30 @@ def getAlignmentDirs( path ):
 	return align_dirs
 
 def getPrimaryFolder( SMRTLinkID ):
+	"""
+	Find location of corresponding primary analysis folder
+	Returns string of folder path
+
+	Kristofor Nyquist 3/14/2016
+	"""
 
 	rootdir  = SMRTLinkID[0:3];
 	linkjob  = SMRTLinkID;
 	filename1 = '/pbi/dept/secondary/siv/smrtlink/smrtlink-beta/jobs-root/' + rootdir + '/' + linkjob + '/tasks/pbsmrtpipe.tasks.subreadset_align_scatter-1/chunk_subreadset_0.subreadset.xml'
 	filename2 = '/pbi/dept/secondary/siv/smrtlink/smrtlink-beta/jobs-root/' + rootdir + '/' + linkjob + '/tasks/pbcoretools.tasks.subreadset_align_scatter-1/chunk_subreadset_0.subreadset.xml'
 
-	flag = 0
+	success = 0
 	try:
 		xml_tree = ET.parse( filename1 )
-		flag = 1
+		success = 1
 	except IOError:
 		try:
 			xml_tree = ET.parse( filename2 )
-			flag = 1
+			success = 1
 		except:
 			print 'Could not find primary location, failing gracefully w/o primary location' # did not find xml file that points to primary folder
 			return None
-	if flag == 1:
+	if success == 1:
 		root = xml_tree.getroot()
 		for layer1 in root:
 			if 'ExternalResources' in layer1.tag:
@@ -95,6 +101,13 @@ def getPrimaryFolder( SMRTLinkID ):
 		return None
 
 def getTotalNumberOfSubreads( SMRTLinkID ):
+	"""
+	Find and open the corresponding subreads.bam file to determine the number of subreads
+	Typical usage: calculating fraction mapped readStart
+	Returns number of subreads.
+
+	Kristofor Nyquist 3/14/2016
+	"""
 	try:
 		primary_path = getPrimaryFolder( SMRTLinkID )
 	except:
@@ -126,31 +139,45 @@ def getReferenceSequence( SMRTLinkID ):
 		rootdir = SMRTLinkID[0:3];
 		linkjob = SMRTLinkID;
 		primary_path = '/pbi/dept/secondary/siv/smrtlink/smrtlink-beta/jobs-root/' + rootdir + '/' + linkjob + '/tasks'
-		xml_tree = ET.parse( primary_path + '/pbsmrtpipe.tasks.gather_alignmentset-1/file.alignmentset.xml' )
-		root = xml_tree.getroot()
-
-		# parse xml file to get path to reference fasta. This is hacky code, but gets the job done
-		flag = 0
-		for layer1 in root:
-		    if 'ExternalResources' in layer1.tag and flag == 0:
-		        for layer2 in layer1:
-		            if 'ExternalResource' in layer2.tag and flag == 0:
-		                for layer3 in layer2:
-		                    if 'ExternalResources' in layer3.tag and flag == 0:
-		                        for layer4 in layer3:
-		                            if 'ExternalResource' in layer4.tag and flag == 0:
-		                                for tup in layer4.items():
-		                                    if tup[0] == 'ResourceId':
-		                                        fastaPath = tup[1]
-		                                        flag = 1
 		
-		# create list of the reference sequence
-		ref_file = open( fastaPath, 'rb' )
-		reference = ''
-		ref_file.next() # skip the header
-		for line in ref_file:
-			reference = reference + line[0:-1] # skip \n symbol
-		return reference
+		success = 0
+		try:
+			xml_tree = ET.parse( primary_path + '/pbsmrtpipe.tasks.gather_alignmentset-1/file.alignmentset.xml' )
+			success = 1
+		except:
+			print 'It appears that this job uses the new filesystem, trying now...'
+			try:
+				xml_tree = ET.parse( primary_path + '/pbcoretools.tasks.gather_alignmentset-1/file.alignmentset.xml' )
+				success = 1
+			except:
+				print 'Still could not open file.alignmentset.xml file for getting path to reference fasta, failing gracefully'
+				return None
+
+		if success == 1:
+			root = xml_tree.getroot()
+
+			# parse xml file to get path to reference fasta. This is hacky code, but gets the job done
+			flag = 0
+			for layer1 in root:
+			    if 'ExternalResources' in layer1.tag and flag == 0:
+			        for layer2 in layer1:
+			            if 'ExternalResource' in layer2.tag and flag == 0:
+			                for layer3 in layer2:
+			                    if 'ExternalResources' in layer3.tag and flag == 0:
+			                        for layer4 in layer3:
+			                            if 'ExternalResource' in layer4.tag and flag == 0:
+			                                for tup in layer4.items():
+			                                    if tup[0] == 'ResourceId':
+			                                        fastaPath = tup[1]
+			                                        flag = 1
+			
+			# create list of the reference sequence
+			ref_file = open( fastaPath, 'rb' )
+			reference = ''
+			ref_file.next() # skip the header
+			for line in ref_file:
+				reference = reference + line[0:-1] # skip \n symbol
+			return reference
 
 def calculateCoverageByGC( SMRTLinkID ):
 	"""
