@@ -388,6 +388,7 @@ def getAlnBamKPIs( alignmentSet, subsampledSet, SMRTLinkID ):
 
 	"""
 	chip                   = {}
+	chip[ 'holenumber' ]   = []
 	chip[ 'readlength' ]   = []
 	chip[ 'templatespan' ] = []
 	chip[ 'insertions' ]   = []
@@ -397,7 +398,7 @@ def getAlnBamKPIs( alignmentSet, subsampledSet, SMRTLinkID ):
 	chip[ 'IPD' ]          = []
 
 	for aln in subsampledSet:
-		chip[ 'holenumber'   ] = aln.HoleNumber
+		chip[ 'holenumber'   ].append( aln.HoleNumber )
 		chip[ 'readlength'   ].append( float( aln.readEnd - aln.readStart ) )
 		chip[ 'templatespan' ].append( float( aln.referenceEnd - aln.referenceStart ) )
 		chip[ 'insertions'   ].append( float( aln.nIns ) / chip[ 'readlength' ][-1] )
@@ -418,6 +419,7 @@ def getAlnBamKPIs( alignmentSet, subsampledSet, SMRTLinkID ):
 		if not total_subreads:
 			print 'getTotalNumberOfSubreads returned None, cannot calculate fraction mapped'
 		else:
+			chip[ 'total subreads' ]  = total_subreads
 			chip[ 'fraction mapped' ] = float(chip[ 'total nreads' ])/total_subreads
 
 	return chip
