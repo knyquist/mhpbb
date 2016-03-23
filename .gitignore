@@ -1,2 +1,6 @@
 # ignore all compiled python files
+<<<<<<< HEAD
 *.pyc
+=======
+*.pyc
+>>>>>>> dev
